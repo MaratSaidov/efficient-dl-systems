@@ -1,13 +1,12 @@
-import typing as tp
 import glob
 import os
+import typing as tp
 import zipfile
-from PIL import Image
-
-from torch.utils.data import Dataset
-from torchvision import transforms
 
 from const import CatsAndDogs
+from PIL import Image
+from torch.utils.data import Dataset
+from torchvision import transforms
 
 
 class CatsDogsDataset(Dataset):
@@ -38,18 +37,18 @@ def extract_dataset_globs() -> tp.Tuple[tp.List[str], tp.List[str]]:
 
     with zipfile.ZipFile(f"{CatsAndDogs.train_dir}.zip") as train_zip:
         train_zip.extractall(CatsAndDogs.directory)
-    
+
     with zipfile.ZipFile(f"{CatsAndDogs.test_dir}.zip") as test_zip:
         test_zip.extractall(CatsAndDogs.directory)
 
     train_list = glob.glob(os.path.join(CatsAndDogs.train_dir, CatsAndDogs.regexp))
     test_list = glob.glob(os.path.join(CatsAndDogs.test_dir, CatsAndDogs.regexp))
-    
+
     return train_list, test_list
 
 
 def get_labels(globs_list: tp.List[str]) -> tp.List[str]:
-    return [path.split('/')[-1].split('.')[0] for path in globs_list]
+    return [path.split("/")[-1].split(".")[0] for path in globs_list]
 
 
 def get_train_transforms() -> tp.Any:
