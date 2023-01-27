@@ -1,9 +1,10 @@
 import glob
 import os
+import random
 import typing as tp
 import zipfile
 
-from const import CatsAndDogs
+from const import CatsAndDogs, Settings
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -29,7 +30,7 @@ class CatsDogsDataset(Dataset):
         return img_transformed, label
 
 
-def extract_dataset_globs() -> tp.Tuple[tp.List[str], tp.List[str]]:
+def extract_dataset_globs(half: bool = True):
     """
     TODO: put the description
     """
@@ -43,6 +44,11 @@ def extract_dataset_globs() -> tp.Tuple[tp.List[str], tp.List[str]]:
 
     train_list = glob.glob(os.path.join(CatsAndDogs.train_dir, CatsAndDogs.regexp))
     test_list = glob.glob(os.path.join(CatsAndDogs.test_dir, CatsAndDogs.regexp))
+
+    if half:
+        train_half_size, test_half_size = len(train_list) // 2, len(test_list) // 2
+        train_list = random.sample(train_list, train_half_size)
+        test_list = random.sample(test_list, test_half_size)
 
     return train_list, test_list
 

@@ -9,14 +9,12 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
 
-# helpers
+# Added profiler for tracking
+from torch.profiler import record_function
 
 
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
-
-
-# classes
 
 
 class PreNorm(nn.Module):
@@ -47,7 +45,7 @@ class Attention(nn.Module):
         project_out = not (heads == 1 and dim_head == dim)
 
         self.heads = heads
-        self.scale = dim_head**-0.5
+        self.scale = dim_head ** (-0.5)
 
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
@@ -86,8 +84,10 @@ class Transformer(nn.Module):
 
     def forward(self, x):
         for attn, ff in self.layers:
-            x = attn(x) + x
-            x = ff(x) + x
+            with record_function("attention"):
+                x = attn(x) + x
+            with record_function("feedforward"):
+                x = ff(x) + x
         return x
 
 
@@ -137,12 +137,15 @@ class ViT(nn.Module):
         self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
 
     def forward(self, img):
-        x = self.to_patch_embedding(img)
-        b, n, _ = x.shape
+        with record_function("embedding"):
+            x = self.to_patch_embedding(img)
+            b, n, _ = x.shape
 
-        cls_tokens = repeat(self.cls_token, "1 1 d -> b 1 d", b=b)
-        x = torch.cat((cls_tokens, x), dim=1)
-        x += self.pos_embedding[:, : (n + 1)]
+        with record_function("positional"):
+            cls_tokens = repeat(self.cls_token, "1 1 d -> b 1 d", b=b)
+            x = torch.cat((cls_tokens, x), dim=1)
+            x += self.pos_embedding[:, : (n + 1)]
+
         x = self.dropout(x)
 
         x = self.transformer(x)
@@ -150,4 +153,8 @@ class ViT(nn.Module):
         x = x.mean(dim=1) if self.pool == "mean" else x[:, 0]
 
         x = self.to_latent(x)
-        return self.mlp_head(x)
+
+        with record_function("mlp_head"):
+            output = self.mlp_head(x)
+
+        return output
