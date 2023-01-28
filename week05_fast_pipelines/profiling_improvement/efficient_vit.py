@@ -38,7 +38,7 @@ class FeedForward(nn.Module):
     @staticmethod
     @torch.jit.script
     def gelu(x):
-        return F.gelu(x)
+        return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
 
     def forward(self, x):
         x = self.fc1(x)
@@ -58,16 +58,12 @@ class Attention(nn.Module):
         self.heads = heads
         self.scale = dim_head ** (-0.5)
 
+        self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
-
-    @staticmethod
-    @torch.jit.script
-    def attend(dots):
-        return F.softmax(dots, dim=-1)
 
     def forward(self, x):
         qkv = self.to_qkv(x).chunk(3, dim=-1)
