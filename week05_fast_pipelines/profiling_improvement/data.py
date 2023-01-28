@@ -30,9 +30,20 @@ class CatsDogsDataset(Dataset):
         return img_transformed, label
 
 
-def extract_dataset_globs(half: bool = True):
+def extract_dataset_globs(half: bool = False):
     """
-    TODO: put the description
+    Retrieves globs related to the Dogs vs. Cats dataset.
+
+    Parameters
+    ----------
+    half: bool
+        If True, only half of the dataset will be used.
+        Useful for the debugging purpose.
+
+    Returns
+    -------
+    train_list, test_list: lists of str
+        Lists of globs for both train and test datasets.
     """
     os.makedirs(CatsAndDogs.directory, exist_ok=True)
 

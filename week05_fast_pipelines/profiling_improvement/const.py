@@ -7,7 +7,7 @@ def get_device() -> str:
 
 class Settings:
     batch_size: int = 32
-    epochs: int = 1
+    epochs: int = 2
     lr: float = 3e-5
     gamma: float = 0.7
     seed: int = 42
