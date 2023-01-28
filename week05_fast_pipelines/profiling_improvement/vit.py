@@ -9,7 +9,7 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
 
-# TODO: remove profiling from vit.py file
+# TODO: remove profiling from vit.py file (including all record_function spots)
 from torch.profiler import record_function
 
 
@@ -20,13 +20,15 @@ def pair(t):
 class PreNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
-        # nn.BatchNorm1d -> nn.LayerNorm
         self.norm = nn.BatchNorm1d(dim)
         # self.norm = nn.LayerNorm(dim)
         self.fn = fn
 
     def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
+        x = rearrange(x, "b l c -> b c l")
+        x = self.norm(x)
+        x = rearrange(x, "b c l -> b l c")
+        return self.fn(x, **kwargs)
 
 
 class FeedForward(nn.Module):
@@ -34,7 +36,11 @@ class FeedForward(nn.Module):
         super().__init__()
         # TODO: fuse this activation function
         self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout)
+            nn.Linear(dim, hidden_dim, bias=True),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim, bias=True),
+            nn.Dropout(dropout)
         )
 
     def forward(self, x):
@@ -53,7 +59,6 @@ class Attention(nn.Module):
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
-        # [128, 128 * 8 * 3]
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
         self.queries = nn.Linear(dim, inner_dim, bias=False)
@@ -67,16 +72,13 @@ class Attention(nn.Module):
         k = self.keys(x)
         v = self.values(x)
 
-        # [B, N, N]
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
         attn = self.attend(dots)
         attn = self.dropout(attn)
 
-        # [B, N, D]
         out = torch.matmul(attn, v)
 
-        # [B, N, D]
         return self.to_out(out)
 
 
@@ -146,7 +148,6 @@ class ViT(nn.Module):
         self.pool = pool
         self.to_latent = nn.Identity()
 
-        # nn.BatchNorm1d -> nn.LayerNorm
         self.mlp_head = nn.Sequential(nn.BatchNorm1d(dim), nn.Linear(dim, num_classes))
         # self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
 
