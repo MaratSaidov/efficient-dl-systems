@@ -4,7 +4,7 @@ import random
 import typing as tp
 import zipfile
 
-from const import CatsAndDogs, Settings
+from const import CatsAndDogs
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms

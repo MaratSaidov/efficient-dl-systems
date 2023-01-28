@@ -8,7 +8,6 @@ import torch
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
-from torch.nn import functional as F
 
 # Added profiler for tracking
 from torch.profiler import record_function
