@@ -20,8 +20,9 @@ def pair(t):
 class PreNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
-        # nn.BatchNorm2d -> nn.LayerNorm
-        self.norm = nn.BatchNorm2d(dim)
+        # nn.BatchNorm1d -> nn.LayerNorm
+        self.norm = nn.BatchNorm1d(dim)
+        # self.norm = nn.LayerNorm(dim)
         self.fn = fn
 
     def forward(self, x, **kwargs):
@@ -53,7 +54,7 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # [128, 128 * 8 * 3]
-        # self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
         self.queries = nn.Linear(dim, inner_dim, bias=False)
         self.keys = nn.Linear(dim, inner_dim, bias=False)
@@ -62,20 +63,20 @@ class Attention(nn.Module):
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
 
     def forward(self, x):
-        # qkv = self.to_qkv(x).chunk(3, dim=-1)
-        # q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=self.heads), qkv)
-
         q = self.queries(x)
         k = self.keys(x)
         v = self.values(x)
 
+        # [B, N, N]
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
         attn = self.attend(dots)
         attn = self.dropout(attn)
 
+        # [B, N, D]
         out = torch.matmul(attn, v)
-        out = rearrange(out, "b h n d -> b n (h d)")
+
+        # [B, N, D]
         return self.to_out(out)
 
 
@@ -145,8 +146,9 @@ class ViT(nn.Module):
         self.pool = pool
         self.to_latent = nn.Identity()
 
-        # nn.BatchNorm2d -> nn.LayerNorm
-        self.mlp_head = nn.Sequential(nn.BatchNorm2d(dim), nn.Linear(dim, num_classes))
+        # nn.BatchNorm1d -> nn.LayerNorm
+        self.mlp_head = nn.Sequential(nn.BatchNorm1d(dim), nn.Linear(dim, num_classes))
+        # self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
 
     def forward(self, img):
         with record_function("embedding"):
