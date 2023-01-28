@@ -9,9 +9,6 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
 
-# TODO: remove profiling from vit.py file (including all record_function spots)
-from torch.profiler import record_function
-
 
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
@@ -21,7 +18,6 @@ class PreNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
         self.norm = nn.BatchNorm1d(dim)
-        # self.norm = nn.LayerNorm(dim)
         self.fn = fn
 
     def forward(self, x, **kwargs):
@@ -34,7 +30,6 @@ class PreNorm(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
-        # TODO: fuse this activation function
         self.net = nn.Sequential(
             nn.Linear(dim, hidden_dim, bias=True),
             nn.GELU(),
@@ -98,10 +93,8 @@ class Transformer(nn.Module):
 
     def forward(self, x):
         for attn, ff in self.layers:
-            with record_function("attention"):
-                x = attn(x) + x
-            with record_function("feedforward"):
-                x = ff(x) + x
+            x = attn(x) + x
+            x = ff(x) + x
         return x
 
 
@@ -149,17 +142,14 @@ class ViT(nn.Module):
         self.to_latent = nn.Identity()
 
         self.mlp_head = nn.Sequential(nn.BatchNorm1d(dim), nn.Linear(dim, num_classes))
-        # self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
 
     def forward(self, img):
-        with record_function("embedding"):
-            x = self.to_patch_embedding(img)
-            b, n, _ = x.shape
+        x = self.to_patch_embedding(img)
+        b, n, _ = x.shape
 
-        with record_function("positional"):
-            cls_tokens = repeat(self.cls_token, "1 1 d -> b 1 d", b=b)
-            x = torch.cat((cls_tokens, x), dim=1)
-            x += self.pos_embedding[:, : (n + 1)]
+        cls_tokens = repeat(self.cls_token, "1 1 d -> b 1 d", b=b)
+        x = torch.cat((cls_tokens, x), dim=1)
+        x += self.pos_embedding[:, : (n + 1)]
 
         x = self.dropout(x)
 
@@ -169,7 +159,5 @@ class ViT(nn.Module):
 
         x = self.to_latent(x)
 
-        with record_function("mlp_head"):
-            output = self.mlp_head(x)
-
+        output = self.mlp_head(x)
         return output

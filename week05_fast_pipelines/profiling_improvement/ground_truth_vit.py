@@ -8,6 +8,7 @@ import torch
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 from torch import nn
+from torch.nn import functional as F
 
 # Added profiler for tracking
 from torch.profiler import record_function
@@ -30,12 +31,24 @@ class PreNorm(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout)
-        )
+        # self.net = nn.Sequential(
+        # nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout)
+        # )
+        self.fc1 = nn.Linear(dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, dim)
+        self.dropout = nn.Dropout(dropout)
+
+    @torch.jit.script
+    def gelu(self, x):
+        return F.gelu(x)
 
     def forward(self, x):
-        return self.net(x)
+        x = self.fc1(x)
+        x = self.gelu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.dropout(x)
+        return x
 
 
 class Attention(nn.Module):
@@ -47,12 +60,16 @@ class Attention(nn.Module):
         self.heads = heads
         self.scale = dim_head ** (-0.5)
 
-        self.attend = nn.Softmax(dim=-1)
+        # self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
+
+    @torch.jit.script
+    def attend(self, dots):
+        return F.softmax(dots, dim=-1)
 
     def forward(self, x):
         qkv = self.to_qkv(x).chunk(3, dim=-1)
