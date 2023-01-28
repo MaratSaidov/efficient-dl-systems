@@ -13,8 +13,3 @@ def seed_everything(seed: int) -> None:
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
-
-
-def visualize_predictions():
-    # TODO: print predictions
-    pass
