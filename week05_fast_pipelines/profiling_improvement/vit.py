@@ -20,7 +20,8 @@ def pair(t):
 class PreNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
-        self.norm = nn.LayerNorm(dim)
+        # nn.BatchNorm2d -> nn.LayerNorm
+        self.norm = nn.BatchNorm2d(dim)
         self.fn = fn
 
     def forward(self, x, **kwargs):
@@ -30,6 +31,7 @@ class PreNorm(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
+        # TODO: fuse this activation function
         self.net = nn.Sequential(
             nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout)
         )
@@ -50,27 +52,22 @@ class Attention(nn.Module):
         self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
-        # TODO: divide it into 3 lines
         # [128, 128 * 8 * 3]
-        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+        # self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
         self.queries = nn.Linear(dim, inner_dim, bias=False)
         self.keys = nn.Linear(dim, inner_dim, bias=False)
         self.values = nn.Linear(dim, inner_dim, bias=False)
 
-        # TODO: concatenate
-
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout)
-        )
-        # [TODO]
-        # self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
+        self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
 
     def forward(self, x):
-        # TODO: переписать две следующие строчки
-        qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=self.heads), qkv)
+        # qkv = self.to_qkv(x).chunk(3, dim=-1)
+        # q, k, v = map(lambda t: rearrange(t, "b n (h d) -> b h n d", h=self.heads), qkv)
+
+        q = self.queries(x)
+        k = self.keys(x)
+        v = self.values(x)
 
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
@@ -148,7 +145,8 @@ class ViT(nn.Module):
         self.pool = pool
         self.to_latent = nn.Identity()
 
-        self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
+        # nn.BatchNorm2d -> nn.LayerNorm
+        self.mlp_head = nn.Sequential(nn.BatchNorm2d(dim), nn.Linear(dim, num_classes))
 
     def forward(self, img):
         with record_function("embedding"):
