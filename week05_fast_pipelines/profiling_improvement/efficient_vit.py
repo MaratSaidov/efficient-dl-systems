@@ -31,15 +31,13 @@ class PreNorm(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
-        # self.net = nn.Sequential(
-        # nn.Linear(dim, hidden_dim), nn.GELU(), nn.Dropout(dropout), nn.Linear(hidden_dim, dim), nn.Dropout(dropout)
-        # )
         self.fc1 = nn.Linear(dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, dim)
         self.dropout = nn.Dropout(dropout)
 
+    @staticmethod
     @torch.jit.script
-    def gelu(self, x):
+    def gelu(x):
         return F.gelu(x)
 
     def forward(self, x):
@@ -60,15 +58,15 @@ class Attention(nn.Module):
         self.heads = heads
         self.scale = dim_head ** (-0.5)
 
-        # self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
         self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
 
+    @staticmethod
     @torch.jit.script
-    def attend(self, dots):
+    def attend(dots):
         return F.softmax(dots, dim=-1)
 
     def forward(self, x):
