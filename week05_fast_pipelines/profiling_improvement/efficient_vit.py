@@ -183,8 +183,9 @@ class ViT(nn.Module):
 
         x = x.mean(dim=1) if self.pool == "mean" else x[:, 0]
 
-        x = self.to_latent(x)
-        x = self.leaky_relu(x)
+        with record_function("to_latent"):
+            x = self.to_latent(x)
+            x = self.leaky_relu(x)
 
         with record_function("mlp_head"):
             output = self.mlp_head(x)
