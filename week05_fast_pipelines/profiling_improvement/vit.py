@@ -35,6 +35,7 @@ class FeedForward(nn.Module):
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, dim, bias=True),
+            nn.ReLU(),
             nn.Dropout(dropout)
         )
 
@@ -46,7 +47,6 @@ class Attention(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.0):
         super().__init__()
         inner_dim = dim_head * heads
-        project_out = not (heads == 1 and dim_head == dim)
 
         self.heads = heads
         self.scale = dim_head ** (-0.5)
@@ -60,7 +60,11 @@ class Attention(nn.Module):
         self.keys = nn.Linear(dim, inner_dim, bias=False)
         self.values = nn.Linear(dim, inner_dim, bias=False)
 
-        self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout),
+            nn.GELU()
+        )
 
     def forward(self, x):
         q = self.queries(x)
@@ -139,7 +143,10 @@ class ViT(nn.Module):
         self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
 
         self.pool = pool
-        self.to_latent = nn.Identity()
+        self.to_latent = nn.Sequential(
+            nn.Identity(),
+            nn.LeakyReLU(negative_slope=0.1)
+        )
 
         self.mlp_head = nn.Sequential(nn.BatchNorm1d(dim), nn.Linear(dim, num_classes))
 

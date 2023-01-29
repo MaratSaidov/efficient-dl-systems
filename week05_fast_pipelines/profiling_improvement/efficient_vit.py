@@ -39,11 +39,17 @@ class FeedForward(nn.Module):
     def gelu(x):
         return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
 
+    @staticmethod
+    @torch.jit.script
+    def relu(x):
+        return x * (x > 0).float()
+
     def forward(self, x):
         x = self.fc1(x)
         x = self.gelu(x)
         x = self.dropout(x)
         x = self.fc2(x)
+        x = self.relu(x)
         x = self.dropout(x)
         return x
 
@@ -62,7 +68,15 @@ class Attention(nn.Module):
 
         self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
 
-        self.to_out = nn.Sequential(nn.Linear(inner_dim, dim), nn.Dropout(dropout)) if project_out else nn.Identity()
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout)
+        )
+
+    @staticmethod
+    @torch.jit.script
+    def gelu(x):
+        return x * 0.5 * (1.0 + torch.erf(x / 1.41421))
 
     def forward(self, x):
         qkv = self.to_qkv(x).chunk(3, dim=-1)
@@ -75,7 +89,9 @@ class Attention(nn.Module):
 
         out = torch.matmul(attn, v)
         out = rearrange(out, "b h n d -> b n (h d)")
-        return self.to_out(out)
+
+        out = self.to_out(out)
+        return self.gelu(out)
 
 
 class Transformer(nn.Module):
@@ -146,6 +162,11 @@ class ViT(nn.Module):
 
         self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
 
+    @staticmethod
+    @torch.jit.script
+    def leaky_relu(x, slope: float = 0.1):
+        return x * (x > 0).float() + slope * x * (x < 0).float()
+
     def forward(self, img):
         with record_function("embedding"):
             x = self.to_patch_embedding(img)
@@ -163,6 +184,7 @@ class ViT(nn.Module):
         x = x.mean(dim=1) if self.pool == "mean" else x[:, 0]
 
         x = self.to_latent(x)
+        x = self.leaky_relu(x)
 
         with record_function("mlp_head"):
             output = self.mlp_head(x)
